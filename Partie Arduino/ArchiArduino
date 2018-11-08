@@ -1,0 +1,16 @@
+Archi app côté Arduino 
+
+
+Action des boutons d'IHM : envoie un msg en série
+
+Fonction des boutons normaux : actionner les moteurs
+
+
+
+Task 0 : gestion réception msg serie
+
+Task 1 : gestion boutons IHM / rotary encoder
+
+Task 2 : gestion boutons inclinaison
+
+Task 3 : ?

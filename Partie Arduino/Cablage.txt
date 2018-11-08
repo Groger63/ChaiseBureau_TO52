@@ -1,0 +1,18 @@
+Shift reg 75HC595 to Relay module :
+Q0 -> In1
+Q1 -> In2
+...
+Q7 -> In8
+
+Shift reg to Arduino
+
+DS -> 8
+STCP -> 9
+SHCP -> 10
+MR -> 5v
+VCC -> 5v
+Gnd -> Gnd
+
+Relay Module to Arduino
+VCC -> 5v
+Gnd -> Gnd
