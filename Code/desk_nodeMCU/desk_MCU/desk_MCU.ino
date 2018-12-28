@@ -5,23 +5,56 @@
 #include <Wire.h> // Include Wire.h to control I2C
 #include <LiquidCrystal_I2C.h> //Download & include the code library can be downloaded below
 #include "Timer.h"
- 
-#include <EEPROM.h>
- 
+
+#include <EEPROM.h> //https://arduino.stackexchange.com/questions/25945/how-to-read-and-write-eeprom-in-esp8266
+
 
 #include <ArduinoJson.h>
 #include <seatmux.h>
 #include <shiftreg.h>
-#include <menu.h>
+
+
+
+
+
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+
+
+#include <ESP8266mDNS.h>
+
+
+//#include <menu.h>
 //#include <menumove.h>
 //#include "User.h"
+
+//-------------------WIFI----------------
+
+#define WIFIDATA_ADDR 0
+
+struct {
+  char ssid[32] = "";
+  char password[32] = "";
+} wifiData;
+
+char ssidClient[32] ;
+
+
+//-------------------AP Init-------------------
+
+/* Set these to your desired credentials. */
+const char *ssidAP = "ChairSetup";
+const char *passwordAP = "0000";
+
+ESP8266WebServer server(80);
 
 
 /*
   Desk chair prototype
   Memorise one position
   There's 4 different motors on the chair and each one has one position
- */
+*/
 
 #define ASSISE 0
 #define AVANCEMENT 1
@@ -46,6 +79,7 @@
 
 //-------------------Potentiometers-------------------
 
+//pins plugged to the MUX (MUX_2)
 #define POT_ASSISE 8   // select the input pin for the potentiometer
 #define POT_AVANCEMENT 9    // select the input pin for the potentiometer
 #define POT_HAUTEUR 10    // select the input pin for the potentiometer
@@ -54,7 +88,7 @@
 
 //-------------------Buttons-------------------
 
-
+//old implementation
 //#define BUTTON_MEM = 11;     // the number of the pushbutton pin
 //#define BUTTON_SET = 12;     // the number of the pushbutton pin
 
@@ -75,11 +109,12 @@
 #define RIGHT 1
 #define SWITCH 2
 
-bool aLastState;  
+bool aLastState;
 boolean aState;
 boolean sw_clicked ;
 bool odd = false ;
 
+//Plugged on the MUX_1
 #define BUTTON_HAUTEUR_FORWARD  2  //23     // the number of the pushbutton pin
 #define BUTTON_HAUTEUR_BACK  1      //25    // the number of the pushbutton pin
 
@@ -96,7 +131,7 @@ bool odd = false ;
 
 //-------------------Screen-------------------
 
-LiquidCrystal_I2C lcd(0x27, 16, 2); //
+LiquidCrystal_I2C lcd(0x27, 16, 2); // plugged on D1 & D2
 bool light_lcd = true ;
 int lcd_event ;
 #define BACKLIGHT_DURATION  3
@@ -104,7 +139,7 @@ int lcd_event ;
 //-------------------Misc-------------------
 
 #define baudrate 9600
-#define MARGIN_MOTOR 70 
+#define MARGIN_MOTOR 70
 Timer timer1 ;
 Timer timer2 ;
 
@@ -114,176 +149,184 @@ Timer timer2 ;
 #define PIN_STCP 12// D6
 #define PIN_SHCP 13 // D7
 
-ShiftReg *myShiftRegPtr = new ShiftReg(PIN_DS,PIN_STCP,PIN_SHCP,2) ;
+ShiftReg *myShiftRegPtr = new ShiftReg(PIN_DS, PIN_STCP, PIN_SHCP, 2) ; //According to the new Schematics, should have a 3rd SR
 
 
 //-------------------Multiplexer-------------------
 
-CustomType4051Mux * digital_mux= new CustomType4051Mux(A0, INPUT, DIGITAL, 9, myShiftRegPtr, 10, 11, 8);
+CustomType4051Mux * digital_mux = new CustomType4051Mux(A0, INPUT, DIGITAL, 9, myShiftRegPtr, 10, 11, 8);
 CustomType4051Mux * analog_mux = new CustomType4051Mux(A0, INPUT, DIGITAL, 13, myShiftRegPtr, 14, 15, 12 );
 //Type4051Mux * analog_mux = new Type4051Mux(A0, INPUT, ANALOG, );
 //Type4051Mux * digital_mux = new Type4051Mux();
 
 //-------------------IHM-------------------
+//TODO
+/*
+  Menu * homeMenu = new Menu("Home");
+  int nb_submenus = 5 ;
 
-Menu * homeMenu = new Menu("Home");
-int nb_submenus = 5 ;
+  Menu * SubMenu1 = new Menu(homeMenu,"SubMenu1");
+  Menu * SubMenu2 = new Menu(homeMenu,"SubMenu2");
+  Menu * SubMenu3 = new Menu(homeMenu,"SubMenu3");
 
-Menu * SubMenu1 = new Menu(homeMenu,"SubMenu1");
-Menu * SubMenu2 = new Menu(homeMenu,"SubMenu2");
-Menu * SubMenu3 = new Menu(homeMenu,"SubMenu3");
+  Menu * SubMenu4 = new Menu(homeMenu,"SubMenu4");
+  Menu * SubMenu5 = new Menu(homeMenu,"SubMenu5");
 
-Menu * SubMenu4 = new Menu(homeMenu,"SubMenu4");
-Menu * SubMenu5 = new Menu(homeMenu,"SubMenu5");
+  Menu * submenus[] = {SubMenu1,SubMenu2,SubMenu3,SubMenu4,SubMenu5} ;
 
-Menu * submenus[] = {SubMenu1,SubMenu2,SubMenu3,SubMenu4,SubMenu5} ;
-
-Menu * myMenu ;
-
+  Menu * myMenu ;
+*/
 
 
 
 //-------------------Motor units-------------------
 
-Motor *assise=new Motor(
+//TODO finish code to have a % value
+
+Motor *assise = new Motor(
   ASSISE_BACK,
   ASSISE_FORWARD,
   BUTTON_ASSISE_BACK,
   BUTTON_ASSISE_FORWARD,
   POT_ASSISE,
   MARGIN_MOTOR ,
-  myShiftRegPtr, 
+  myShiftRegPtr,
   digital_mux
-  ) ;
-  
-Motor *avancement=new Motor(
+) ;
+
+Motor *avancement = new Motor(
   AVANCEMENT_BACK,
   AVANCEMENT_FORWARD,
   BUTTON_AVANCEMENT_BACK,
   BUTTON_AVANCEMENT_FORWARD,
   POT_AVANCEMENT,
   MARGIN_MOTOR,
-  myShiftRegPtr, 
+  myShiftRegPtr,
   digital_mux
-  ) ;
-  
-Motor *hauteur=new Motor(
+) ;
+
+Motor *hauteur = new Motor(
   HAUTEUR_BACK,
   HAUTEUR_FORWARD,
   BUTTON_HAUTEUR_BACK,
   BUTTON_HAUTEUR_FORWARD,
   POT_HAUTEUR,
   MARGIN_MOTOR,
-  myShiftRegPtr, 
+  myShiftRegPtr,
   digital_mux
-  );
-Motor *dossier=new Motor(
+);
+Motor *dossier = new Motor(
   DOSSIER_BACK,
   DOSSIER_FORWARD,
   BUTTON_DOSSIER_BACK,
   BUTTON_DOSSIER_FORWARD,
   POT_DOSSIER,
   MARGIN_MOTOR,
-  myShiftRegPtr, 
+  myShiftRegPtr,
   digital_mux
-  );
+);
 
 
 Motor *  motors[] = {assise, avancement, hauteur, dossier} ;
 
 //-------------------Seat-------------------
 
-int position_asked[4] ={ 512, 512 , 512, 512 } ;
+int position_asked[4] = { 512, 512 , 512, 512 } ;
 bool move_asked = false ;
 bool aborting = false ;
-Seat * seat = new Seat(assise,avancement,hauteur,dossier);
+Seat * seat = new Seat(assise, avancement, hauteur, dossier);
 
 
 //-------------------Setup routine-------------------
 
-void setup() {        
+void setup() {
 
-  Serial.begin(baudrate);  
-    Serial.println("Booting...") ;
-    
-    pinMode (ROTARY_DT,INPUT);
-    pinMode (ROTARY_CLK,INPUT);
-    pinMode (ROTARY_SW,INPUT);
-    digitalWrite(ROTARY_SW, HIGH);
+  Serial.begin(baudrate);
+  Serial.println("Booting...") ;
 
-    // initialize the LCD
-    lcd.begin();
-    lcd.clear();
-    // Turn on the blacklight and print a message.
+  pinMode (ROTARY_DT, INPUT);
+  pinMode (ROTARY_CLK, INPUT);
+  pinMode (ROTARY_SW, INPUT);
+  digitalWrite(ROTARY_SW, HIGH);
 
-    write_lcd("Hello world !","----o----");
+  // initialize the LCD
+  lcd.begin();
+  lcd.clear();
+  // Turn on the blacklight and print a message.
 
-    Serial.println("Booting...") ;
-    
-    aLastState = digitalRead(ROTARY_DT);   
-    sw_clicked = false ;
+  write_lcd("Hello world !", "----o----");
 
-    //Menu *toto = new Menu();
-    //myMenu = new Menu(); //Move(toto) ;
-    //Menu *test = new MenuMove(toto);
+  Serial.println("Booting...") ;
+
+  aLastState = digitalRead(ROTARY_DT);
+  sw_clicked = false ;
+
+  //Menu *toto = new Menu();
+  //myMenu = new Menu(); //Move(toto) ;
+  //Menu *test = new MenuMove(toto);
+  /*
     for(Menu * men : submenus)
     {
-      men->set_parent(homeMenu) ;
+    men->set_parent(homeMenu) ;
     }
-   // homeMenu->set_submenus(submenus, 5) ;
-    
-    //HomeMenu->
-    
-   // myMenu = homeMenu ;
-analog_mux->setEnabled(false);
+  */
+  // homeMenu->set_submenus(submenus, 5) ;
+
+  //HomeMenu->
+
+  // myMenu = homeMenu ;
+
+  //initAP();
+
+  analog_mux->setEnabled(false); // ?
 }
 
 //-------------------Loop-------------------
 
-void loop() 
+void loop()
 {
- /* 
-  for(int i = 0 ; i<8; i++)
-  {
-    Serial.print( digital_mux->read(i));
-    Serial.print("\t");
+  /*
+    for(int i = 0 ; i<8; i++)
+    {
+     Serial.print( digital_mux->read(i));
+     Serial.print("\t");
 
-  }
-  
-    Serial.println();
-    Serial.println();
-*/
-  
-  if(move_asked)
+    }
+
+     Serial.println();
+     Serial.println();
+  */
+
+  if (move_asked)
   {
     move_asked = seat->move_to(
-                    position_asked[ASSISE], 
-                    position_asked[AVANCEMENT],
-                    position_asked[HAUTEUR],
-                    position_asked[DOSSIER]
-                  );
-    if(!move_asked)
+                   position_asked[ASSISE],
+                   position_asked[AVANCEMENT],
+                   position_asked[HAUTEUR],
+                   position_asked[DOSSIER]
+                 );
+    if (!move_asked)
     {
       // Send more like a Json msg
       Serial.println("stopped");
     }
   }
-  if(!seat->moving)
+  if (!seat->moving)
   {
-    
+
     seat->read_buttons();
   }
-  
+
   check_rotary();
   timer1.update();
   timer2.update();
-  
+
   serialEvent() ;
 }
 
 static void start_backlight()
 {
-  if(light_lcd)
+  if (light_lcd)
   {
     timer1.stop(lcd_event);
   }
@@ -292,10 +335,10 @@ static void start_backlight()
     light_lcd = true ;
     lcd.setBacklight(light_lcd); //Set Back light turn On
   }
-  lcd_event = timer1.after(BACKLIGHT_DURATION * 1000, stop_backlight) ;
+  lcd_event = timer1.after(10000, stop_backlight, (void*)10);
 }
 
-static void stop_backlight()
+void stop_backlight(void* context)
 {
   light_lcd = false ;
   lcd.setBacklight(light_lcd); //Set Back light turn On
@@ -304,65 +347,149 @@ static void stop_backlight()
 static void stop_seat()
 {
   Serial.print("Stop");
-  for(int i = 0 ; i < 4 ; i++)
+  for (int i = 0 ; i < 4 ; i++)
   {
     motors[i]->go_stop();
   }
-  seat->moving=false;
+  seat->moving = false;
 }
 
 void display_menu()
 {
-  write_lcd(myMenu->line1, myMenu->line2) ;
+  //  write_lcd(myMenu->line1, myMenu->line2) ;
 }
 
 void write_lcd(String line1, String line2)
 {
   lcd.clear();
-  lcd.setCursor(0,0);
+  lcd.setCursor(0, 0);
   lcd.print(line1);
-  lcd.setCursor(0,1);
+  lcd.setCursor(0, 1);
   lcd.print(line2);
   start_backlight();
 }
 
 void check_rotary()
 {
-   // Reads the initial state of the outputA
+  // Reads the initial state of the outputA
 
-    aState = digitalRead(ROTARY_DT); // Reads the "current" state of the outputA
-    // If the previous and the current state of the outputA are different, that means a Pulse has occured
+  aState = digitalRead(ROTARY_DT); // Reads the "current" state of the outputA
+  // If the previous and the current state of the outputA are different, that means a Pulse has occured
 
-    
-    if(digitalRead(ROTARY_SW) == LOW && !sw_clicked)
+
+  if (digitalRead(ROTARY_SW) == LOW && !sw_clicked)
+  {
+    //myMenu->update(SWITCH);
+  }
+  else if (digitalRead(ROTARY_SW) == HIGH && sw_clicked) sw_clicked = false ;
+
+  else if (aState != aLastState)
+  {
+    if (odd)
     {
-      myMenu->update(SWITCH);
-    }
-    else if(digitalRead(ROTARY_SW) == HIGH && sw_clicked) sw_clicked = false ;
-    
-    else if(aState != aLastState)
-    {     
-      if(odd)
+      // If the outputB state is different to the outputA state, that means the encoder is rotating clockwise
+      if (digitalRead(ROTARY_CLK) != aState)
       {
-        // If the outputB state is different to the outputA state, that means the encoder is rotating clockwise
-        if (digitalRead(ROTARY_CLK) != aState) 
-        { 
-          myMenu->update(LEFT);
-        } 
-        else 
-        {
-          myMenu->update(RIGHT) ; 
-        }
+        //myMenu->update(LEFT);
       }
-      odd = !odd;
-      display_menu();
+      else
+      {
+        //myMenu->update(RIGHT) ;
+      }
     }
-    aLastState = aState; // Updates the previous state of the outputA with the current state
+    odd = !odd;
+    //display_menu();
+  }
+  aLastState = aState; // Updates the previous state of the outputA with the current state
 }
+
+
+void initWifi()
+{
+  //Read wifi info from memory
+  EEPROM.get(WIFIDATA_ADDR, wifiData);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(wifiData.ssid, wifiData.password);
+
+  // Try connection
+  int timeout = 20 ;
+
+  //screen print "trying connection..."
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+    timeout -- ;
+    //Connection failed
+    if (timeout <= 0 )
+    {
+      //print screen "connection failed, starting AP..."
+      //start AP
+      initAP() ;
+      while (WiFi.status() != WL_CONNECTED)
+      {
+        server.handleClient();
+      }
+      timeout = 20 ;
+      //screen print "trying connection..."
+    }
+  }
+
+  Serial.println("");
+  Serial.print("Connected to ");
+  Serial.println(wifiData.ssid);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+      //screen print "connected ! \rIP : WiFi.localIP()"
+  if (MDNS.begin("esp8266")) {
+    Serial.println("MDNS responder started");
+  }
+
+  EEPROM.put(WIFIDATA_ADDR, wifiData);
+  EEPROM.commit();
+
+}
+
+void initAP()
+{
+
+
+  Serial.print("Configuring access point...");
+  /* You can remove the password parameter if you want the AP to be open. */
+  WiFi.softAP(ssidAP, passwordAP);
+
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+  server.on("/", handleRootAP);
+  server.begin();
+  Serial.println("HTTP server started");
+  delay(1000);
+  //print on screen "SSID : ssidAP \r Password : passwordAP\rIP : IPAddress "
+}
+
+void handleRootAP() {
+  server.send(200, "text/html", "<h1>You are connected</h1>"); //put connexion window here TODO
+}
+
+void handleGetSSID_AP() {
+  server.send(200, "text/html", "<h1>Connexion...</h1><br><h2>AP Shutting down. Please follow on-screen instructions</h2>"); //put connexion window here TODO
+
+  //get SSID & Password from post request<
+
+  WiFi.softAPdisconnect(true); //https://github.com/esp8266/Arduino/issues/676
+
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(wifiData.ssid, wifiData.password);
+}
+
 
 void serialEvent() { //polling method...
 
- 
+
   while (Serial.available() > 0) {
 
 
@@ -370,7 +497,7 @@ void serialEvent() { //polling method...
     JsonObject& command = jsonBuffer.parseObject(Serial);
     String cmd = command["cmd"];
 
-    if( cmd == "abort" )
+    if ( cmd == "abort" )
     {
       seat->aborts = true ;
       const int capacity = JSON_OBJECT_SIZE(2);
@@ -380,7 +507,7 @@ void serialEvent() { //polling method...
       obj["answer"] = "ok";
       obj.printTo(Serial);
     }
-    else if( cmd == "get" )
+    else if ( cmd == "get" )
     {
       //create Json object with each seat position
       const int capacity = JSON_OBJECT_SIZE(6);
@@ -392,22 +519,22 @@ void serialEvent() { //polling method...
       obj["assise"] = motors[ASSISE]->get_position() ;
       obj["avancement"] = motors[AVANCEMENT]->get_position() ;
       obj["hauteur"] = motors[HAUTEUR]->get_position() ;
-      
+
       obj.printTo(Serial);
     }
-    else if(cmd == "set" )
+    else if (cmd == "set" )
     {
       int dossier = command["dossier"] ;
       int avancement = command["avancement"] ;
       int assise = command["assise"] ;
       int hauteur = command["assise"] ;
-      
+
       position_asked[DOSSIER] = dossier ;
       position_asked[ASSISE] = assise ;
       position_asked[AVANCEMENT] = avancement ;
       position_asked[HAUTEUR] = hauteur ;
       move_asked = true ;
-      
+
       const int capacity = JSON_OBJECT_SIZE(2);
       StaticJsonBuffer<capacity> jb;
       JsonObject& obj = jb.createObject();
@@ -415,20 +542,20 @@ void serialEvent() { //polling method...
       obj["answer"] = "ok";
       obj.printTo(Serial);
     }
-    else if( cmd == "move" )
+    else if ( cmd == "move" )
     {
       int dossier = command["dossier"] ;
       int avancement = command["avancement"] ;
       int assise = command["assise"] ;
       int hauteur = command["hauteur"] ;
-            
-      position_asked[DOSSIER] =motors[DOSSIER]->get_position() + dossier ;
+
+      position_asked[DOSSIER] = motors[DOSSIER]->get_position() + dossier ;
       position_asked[ASSISE] = motors[ASSISE]->get_position() + assise ;
       position_asked[AVANCEMENT] = motors[AVANCEMENT]->get_position() + avancement ;
       position_asked[HAUTEUR] = motors[HAUTEUR]->get_position() + hauteur ;
-      
+
       move_asked = true ;
-      
+
       const int capacity = JSON_OBJECT_SIZE(2);
       StaticJsonBuffer<capacity> jb;
       JsonObject& obj = jb.createObject();
@@ -436,7 +563,7 @@ void serialEvent() { //polling method...
       obj["answer"] = "ok";
       obj.printTo(Serial);
     }
-    else 
+    else
     {
       const int capacity = JSON_OBJECT_SIZE(2);
       StaticJsonBuffer<capacity> jb;
@@ -447,4 +574,4 @@ void serialEvent() { //polling method...
     }
     Serial.readString(); // Just to make sure everything is read
   }
- }
+}

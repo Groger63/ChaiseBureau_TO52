@@ -4,7 +4,7 @@
 
 #include <Wire.h> // Include Wire.h to control I2C
 #include <LiquidCrystal_I2C.h> //Download & include the code library can be downloaded below
-#include "Timer.h"
+//#include "Timer.h"
  
 #include <EEPROM.h>
  
@@ -12,7 +12,7 @@
 #include <ArduinoJson.h>
 #include <seatmux.h>
 #include <shiftreg.h>
-#include <menu.h>
+//#include <menu.h>
 //#include <menumove.h>
 //#include "User.h"
 
@@ -114,7 +114,7 @@ Timer timer2 ;
 #define PIN_STCP 12// D6
 #define PIN_SHCP 13 // D7
 
-ShiftReg *myShiftRegPtr = new ShiftReg(PIN_DS,PIN_STCP,PIN_SHCP,2) ;
+ShiftReg *myShiftRegPtr = new ShiftReg(PIN_DS,PIN_STCP,PIN_SHCP,2) ; 
 
 
 //-------------------Multiplexer-------------------
