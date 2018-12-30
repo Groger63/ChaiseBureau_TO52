@@ -5,7 +5,7 @@
   Released into the public domain.
 */
 
-#include "seat.h"
+#include "seatmux.h"
 #include "Arduino.h"
 #include <ArduinoJson.h>
 
@@ -25,10 +25,10 @@ Seat::~Seat(){};
 
 void Seat::read_buttons() 
 {
+	motor_avancement->read_buttons() ;
 	motor_dossier->read_buttons();
 	motor_assise->read_buttons();
 	motor_hauteur->read_buttons() ;
-	motor_avancement->read_buttons() ;
 }
 
 /*void Seat::move_to(int assise, int avancement, int hauteur, int dossier)

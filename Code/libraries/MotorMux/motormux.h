@@ -13,11 +13,13 @@
 
 #include "Arduino.h"
 #include <shiftreg.h>
+#include <CustomType4051Mux.h>
 
 class Motor{
 	private :
 	public :
         ShiftReg *myShiftReg ; 
+        CustomType4051Mux * myMux ;
 		int MOTOR_BACK; //pin assigned to motor back
 		int MOTOR_FORWARD; //pin assigned to motor forward
 		int POTENTIOMETER ; //pin assigned to potentiometer which determines the position
@@ -34,22 +36,25 @@ class Motor{
 		int go_backward(); //activate motors to move to the chosen position
 		int go_stop(); //activate motors to move to the chosen position
 
-		int get_position();//basically just returns the value of the pot
+		int get_position();//basically just returns the position in %
 		bool is_arrived(int position);
 		int select_direction(int position);
 		
         byte moving_status ;
 		short position ; //position of the motor. Varies from 0 to 1023
-		Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_FORWARD, int _POTENTIOMETER, int _MARGIN_MOTOR, int _MAX_POT, int _MIN_POT, ShiftReg *SR);
-		Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_FORWARD, int _POTENTIOMETER, int _MARGIN_MOTOR, ShiftReg *SR);
-		Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _POTENTIOMETER, int _MARGIN_MOTOR, ShiftReg *SR);
+
+		Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_FORWARD, int _POTENTIOMETER, float _MARGIN_MOTOR, int _MAX_POT, int _MIN_POT, ShiftReg *SR, CustomType4051Mux *mux);
+		Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_FORWARD, int _POTENTIOMETER, float _MARGIN_MOTOR, ShiftReg *SR, CustomType4051Mux *mux);
+		Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_FORWARD, int _POTENTIOMETER, float _MARGIN_MOTOR, ShiftReg *SR);
+		//Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _POTENTIOMETER, int _MARGIN_MOTOR, ShiftReg *SR);
+		Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _POTENTIOMETER, float _MARGIN_MOTOR, ShiftReg *SR);
 
 		Motor();
 		Motor(const Motor &mot);
 		~Motor();
 
 		void read_buttons() ;
-		void move_to(int new_pos); //activate motors to move to the chosen position
+		//void move_to(int new_pos); //activate motors to move to the chosen position
 };
 
 #endif

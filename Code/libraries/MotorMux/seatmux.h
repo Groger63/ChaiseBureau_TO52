@@ -12,7 +12,7 @@
 #define STOP 0 
 
 #include "Arduino.h"
-#include "motor.h"
+#include "motormux.h"
 
 class Seat{
 	private :

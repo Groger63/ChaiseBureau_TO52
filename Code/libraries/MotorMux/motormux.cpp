@@ -5,11 +5,11 @@
   Released into the public domain.
 */
 
-#include "motor.h"
+#include "motormux.h"
 #include "Arduino.h"
 
 
-Motor::Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _POTENTIOMETER, int _MARGIN_MOTOR, ShiftReg *SR): myShiftReg(SR)
+Motor::Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _POTENTIOMETER, float _MARGIN_MOTOR, ShiftReg *SR): myShiftReg(SR)
 {
 	POTENTIOMETER=_POTENTIOMETER;
 	MOTOR_BACK = _MOTOR_BACK;
@@ -21,7 +21,7 @@ Motor::Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _POTENTIOMETER, int _MARGIN
   go_stop();
 };
 
-Motor::Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_FORWARD, int _POTENTIOMETER, int _MARGIN_MOTOR, ShiftReg *SR)
+Motor::Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_FORWARD, int _POTENTIOMETER, float _MARGIN_MOTOR, ShiftReg *SR)
 {
   POTENTIOMETER=_POTENTIOMETER;
 
@@ -40,7 +40,7 @@ Motor::Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_F
   go_stop();
 };
 
-Motor::Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_FORWARD, int _POTENTIOMETER, int _MARGIN_MOTOR, int _MAX_POT, int _MIN_POT, ShiftReg *SR)
+Motor::Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_FORWARD, int _POTENTIOMETER, float _MARGIN_MOTOR, ShiftReg *SR, CustomType4051Mux *mux)
 {
   POTENTIOMETER=_POTENTIOMETER;
 
@@ -52,13 +52,33 @@ Motor::Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_F
   BUTTON_FORWARD = _BUTTON_FORWARD;
   BUTTON_BACK = _BUTTON_BACK;
 
-  MAX_POT = _MAX_POT;
+  myShiftReg = SR ;
+  position = 0;
+
+  myMux = mux ;
+  go_stop();
+};
+
+
+Motor::Motor(int _MOTOR_BACK,int _MOTOR_FORWARD, int _BUTTON_BACK, int _BUTTON_FORWARD, int _POTENTIOMETER, float _MARGIN_MOTOR, int _MAX_POT, int _MIN_POT, ShiftReg *SR, CustomType4051Mux *mux)
+{
+  POTENTIOMETER=_POTENTIOMETER;
+
+  MOTOR_BACK = _MOTOR_BACK;
+  MOTOR_FORWARD = _MOTOR_FORWARD;
+
+  MARGIN_MOTOR = _MARGIN_MOTOR;
+
+  BUTTON_FORWARD = _BUTTON_FORWARD;
+  BUTTON_BACK = _BUTTON_BACK;
+
+  MAX_POT = _MAX_POT ;
   MIN_POT = _MIN_POT ;
 
   myShiftReg = SR ;
   position = 0;
 
-
+  myMux = mux ;
   go_stop();
 };
 
@@ -68,22 +88,26 @@ Motor::Motor(const Motor &mot){};
 
 Motor::~Motor(){};
 
-int Motor::get_position() // renvoie en % la valeur de la position
+int Motor::get_position() //returns the position in a %
 {
-  /*
+    /*
   min val max 
   val% = val - min 
   val% = (val% / (max-min) )* 100
   */
+  float pos = myMux->read(POTENTIOMETER);
+  pos = pos - MIN_POT ;
+  return (pos / (float)(MAX_POT-MIN_POT) ) * 100.0;
 
-
-  return analogRead(POTENTIOMETER);
-};//basically just returns the value of the pot
+  //return analogRead(POTENTIOMETER);
+};
 
 
 int Motor::go_forward()
 {
-  if(analogRead(POTENTIOMETER))
+  if(get_position() >= 100.0 - MARGIN_MOTOR ) return go_stop() ;
+
+
   if(moving_status == FORWARD) return FORWARD;
   moving_status = FORWARD;
 
@@ -97,6 +121,9 @@ int Motor::go_forward()
 
 int Motor::go_backward()
 {
+
+  if(get_position() <= 0.0 + MARGIN_MOTOR ) return go_stop() ;
+
   if(moving_status == BACK) return BACK;
 
   moving_status = BACK;
@@ -138,42 +165,19 @@ bool Motor::is_arrived(int position)
   return ( get_position() < position + MARGIN_MOTOR && get_position() > position - MARGIN_MOTOR ) ;
 }
 
-void Motor::move_to(int new_pos)
-{
-	int position_pot =0 ;
-	int arrived =0 ;
 
-    while(!arrived){
-          
-      position_pot = analogRead(POTENTIOMETER);    // read the value from the sensor
-      
-      if(position_pot < new_pos + MARGIN_MOTOR && position_pot >new_pos - MARGIN_MOTOR)
-      {
-        arrived = 1 ;
-       
-      }
-      if(position_pot < (new_pos -MARGIN_MOTOR)){
-        go_backward();
-      }     
-      if(position_pot > (new_pos + MARGIN_MOTOR)){
-        go_forward();
-      }
-    }
-
-    go_stop();   
-  
-} // old, can be removed
 
 
 void Motor::read_buttons()
 {
-  if (digitalRead(BUTTON_FORWARD) == HIGH) 
+  if (myMux->read(BUTTON_FORWARD) == HIGH) 
   {
     go_forward();
   } 
-  else if (digitalRead(BUTTON_BACK) == HIGH) 
+  else if (myMux->read(BUTTON_BACK) == HIGH) 
   {
     go_backward();
   }
   else go_stop();
+
 } 
