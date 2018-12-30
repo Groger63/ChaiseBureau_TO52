@@ -38,7 +38,6 @@ struct {
   char password[32] = "";
 } wifiData;
 
-char ssidClient[32] ;
 
 
 //-------------------AP Init-------------------
@@ -56,34 +55,7 @@ ESP8266WebServer server(80);
   There's 4 different motors on the chair and each one has one position
 */
 
-#define ASSISE 0
-#define AVANCEMENT 1
-#define HAUTEUR 2
-#define DOSSIER 3
 
-//-------------------Motors-------------------
-
-// Pins plugged to the shift reg
-#define DOSSIER_BACK 0
-#define DOSSIER_FORWARD 1
-
-#define HAUTEUR_BACK 2
-#define HAUTEUR_FORWARD 3
-
-#define AVANCEMENT_BACK 4
-#define AVANCEMENT_FORWARD 5
-
-#define ASSISE_BACK 6//36;
-#define ASSISE_FORWARD 7//34;
-
-
-//-------------------Potentiometers-------------------
-
-//pins plugged to the MUX (MUX_2)
-#define POT_ASSISE 8   // select the input pin for the potentiometer
-#define POT_AVANCEMENT 9    // select the input pin for the potentiometer
-#define POT_HAUTEUR 10    // select the input pin for the potentiometer
-#define POT_DOSSIER 11    // select the input pin for the potentiometer
 
 
 //-------------------Buttons-------------------
@@ -97,8 +69,6 @@ ESP8266WebServer server(80);
 //#define BUTTON_MOTOR_FORWARD = 12;     // the number of the pushbutton pin
 
 //#define LED_MOTOR_SELECT = 13 ;
-
-
 
 // Rotary Encoder
 
@@ -115,18 +85,9 @@ boolean sw_clicked ;
 bool odd = false ;
 
 //Plugged on the MUX_1
-#define BUTTON_HAUTEUR_FORWARD  2  //23     // the number of the pushbutton pin
-#define BUTTON_HAUTEUR_BACK  1      //25    // the number of the pushbutton pin
-
-#define BUTTON_ASSISE_FORWARD 6//31     // the number of the pushbutton pin
-#define BUTTON_ASSISE_BACK 4   //33  // the number of the pushbutton pin
-
-#define BUTTON_DOSSIER_FORWARD 7    // the number of the pushbutton pin
-#define BUTTON_DOSSIER_BACK 5    // the number of the pushbutton pin
 
 
-#define BUTTON_AVANCEMENT_FORWARD 3    // the number of the pushbutton pin
-#define BUTTON_AVANCEMENT_BACK 0     // the number of the pushbutton pin
+
 
 
 //-------------------Screen-------------------
@@ -139,7 +100,6 @@ int lcd_event ;
 //-------------------Misc-------------------
 
 #define baudrate 9600
-#define MARGIN_MOTOR 70
 Timer timer1 ;
 Timer timer2 ;
 
@@ -155,7 +115,7 @@ ShiftReg *myShiftRegPtr = new ShiftReg(PIN_DS, PIN_STCP, PIN_SHCP, 2) ; //Accord
 //-------------------Multiplexer-------------------
 
 CustomType4051Mux * digital_mux = new CustomType4051Mux(A0, INPUT, DIGITAL, 9, myShiftRegPtr, 10, 11, 8);
-CustomType4051Mux * analog_mux = new CustomType4051Mux(A0, INPUT, DIGITAL, 13, myShiftRegPtr, 14, 15, 12 );
+CustomType4051Mux * analog_mux = new CustomType4051Mux(A0, INPUT, ANALOG, 13, myShiftRegPtr, 14, 15, 12 );
 //Type4051Mux * analog_mux = new Type4051Mux(A0, INPUT, ANALOG, );
 //Type4051Mux * digital_mux = new Type4051Mux();
 
@@ -183,51 +143,108 @@ CustomType4051Mux * analog_mux = new CustomType4051Mux(A0, INPUT, DIGITAL, 13, m
 
 //TODO finish code to have a % value
 
+#define ASSISE 0
+#define AVANCEMENT 1
+#define HAUTEUR 2
+#define DOSSIER 3
+
+// On SR_1
+#define PIN_MOTOR_ASSISE_BACK 6//36;
+#define PIN_MOTOR_ASSISE_FORWARD 7//34;
+//on MUX_1
+#define PIN_BUTTON_ASSISE_FORWARD 6//31     // the number of the pushbutton pin
+#define PIN_BUTTON_ASSISE_BACK 4   //33  // the number of the pushbutton pin
+//mux_2
+#define PIN_POT_ASSISE 8   // select the input pin for the potentiometer
+//TODO : define MAX & MIN pot & margin
+#define MAX_POT_ASSISE 1023
+#define MIN_POT_ASSISE 0
+const float margin_motor_assise = 0.1 ;
+
 Motor *assise = new Motor(
-  ASSISE_BACK,
-  ASSISE_FORWARD,
-  BUTTON_ASSISE_BACK,
-  BUTTON_ASSISE_FORWARD,
-  POT_ASSISE,
-  MARGIN_MOTOR ,
+  PIN_MOTOR_ASSISE_BACK,
+  PIN_MOTOR_ASSISE_FORWARD,
+  PIN_BUTTON_ASSISE_BACK,
+  PIN_BUTTON_ASSISE_FORWARD,
+  PIN_POT_ASSISE,
+  margin_motor_assise ,
+  MAX_POT_ASSISE,
+  MIN_POT_ASSISE,
   myShiftRegPtr,
   digital_mux
 ) ;
+
+
+#define PIN_MOTOR_AVANCEMENT_BACK 4
+#define PIN_MOTOR_AVANCEMENT_FORWARD 5
+#define PIN_BUTTON_AVANCEMENT_FORWARD 3    // the number of the pushbutton pin
+#define PIN_BUTTON_AVANCEMENT_BACK 0     // the number of the pushbutton pin
+#define PIN_POT_AVANCEMENT 9    // select the input pin for the potentiometer
+#define MAX_POT_AVANCEMENT 1023
+#define MIN_POT_AVANCEMENT 0
+const float margin_motor_avancement = 0.1 ;
 
 Motor *avancement = new Motor(
-  AVANCEMENT_BACK,
-  AVANCEMENT_FORWARD,
-  BUTTON_AVANCEMENT_BACK,
-  BUTTON_AVANCEMENT_FORWARD,
-  POT_AVANCEMENT,
-  MARGIN_MOTOR,
+  PIN_MOTOR_AVANCEMENT_BACK,
+  PIN_MOTOR_AVANCEMENT_FORWARD,
+  PIN_BUTTON_AVANCEMENT_BACK,
+  PIN_BUTTON_AVANCEMENT_FORWARD,
+  PIN_POT_AVANCEMENT,
+  margin_motor_avancement,
+  MAX_POT_AVANCEMENT,
+  MIN_POT_AVANCEMENT,
   myShiftRegPtr,
   digital_mux
 ) ;
 
+
+#define PIN_MOTOR_HAUTEUR_BACK 2
+#define PIN_MOTOR_HAUTEUR_FORWARD 3
+#define PIN_BUTTON_HAUTEUR_FORWARD  2  //23     // the number of the pushbutton pin
+#define PIN_BUTTON_HAUTEUR_BACK  1      //25    // the number of the pushbutton pin
+#define PIN_POT_HAUTEUR 10    // select the input pin for the potentiometer
+#define MAX_POT_HAUTEUR 1023
+#define MIN_POT_HAUTEUR 0
+const float margin_motor_hauteur = 0.1 ;
+
 Motor *hauteur = new Motor(
-  HAUTEUR_BACK,
-  HAUTEUR_FORWARD,
-  BUTTON_HAUTEUR_BACK,
-  BUTTON_HAUTEUR_FORWARD,
-  POT_HAUTEUR,
-  MARGIN_MOTOR,
+  PIN_MOTOR_HAUTEUR_BACK,
+  PIN_MOTOR_HAUTEUR_FORWARD,
+  PIN_BUTTON_HAUTEUR_BACK,
+  PIN_BUTTON_HAUTEUR_FORWARD,
+  PIN_POT_HAUTEUR,
+  margin_motor_hauteur,
+  MAX_POT_HAUTEUR,
+  MIN_POT_HAUTEUR,
   myShiftRegPtr,
   digital_mux
 );
+
+// Pins plugged to the shift reg
+#define PIN_MOTOR_DOSSIER_BACK 0
+#define PIN_MOTOR_DOSSIER_FORWARD 1
+#define PIN_BUTTON_DOSSIER_FORWARD 7    // the number of the pushbutton pin
+#define PIN_BUTTON_DOSSIER_BACK 5    // the number of the pushbutton pin
+#define PIN_POT_DOSSIER 11    // select the input pin for the potentiometer
+#define MAX_POT_DOSSIER 1023
+#define MIN_POT_DOSSIER 0
+const float margin_motor_dossier = 0.1 ;
+
 Motor *dossier = new Motor(
-  DOSSIER_BACK,
-  DOSSIER_FORWARD,
-  BUTTON_DOSSIER_BACK,
-  BUTTON_DOSSIER_FORWARD,
-  POT_DOSSIER,
-  MARGIN_MOTOR,
+  PIN_MOTOR_DOSSIER_BACK,
+  PIN_MOTOR_DOSSIER_FORWARD,
+  PIN_BUTTON_DOSSIER_BACK,
+  PIN_BUTTON_DOSSIER_FORWARD,
+  PIN_POT_DOSSIER,
+  margin_motor_dossier,
+  MAX_POT_DOSSIER,
+  MIN_POT_DOSSIER,
   myShiftRegPtr,
   digital_mux
 );
 
 
-Motor *  motors[] = {assise, avancement, hauteur, dossier} ;
+Motor *  motors[4] = {assise, avancement, hauteur, dossier} ;
 
 //-------------------Seat-------------------
 
@@ -249,6 +266,10 @@ void setup() {
   pinMode (ROTARY_SW, INPUT);
   digitalWrite(ROTARY_SW, HIGH);
 
+  aLastState = digitalRead(ROTARY_DT);
+  sw_clicked = false ;
+
+
   // initialize the LCD
   lcd.begin();
   lcd.clear();
@@ -257,9 +278,6 @@ void setup() {
   write_lcd("Hello world !", "----o----");
 
   Serial.println("Booting...") ;
-
-  aLastState = digitalRead(ROTARY_DT);
-  sw_clicked = false ;
 
   //Menu *toto = new Menu();
   //myMenu = new Menu(); //Move(toto) ;
@@ -313,7 +331,6 @@ void loop()
   }
   if (!seat->moving)
   {
-
     seat->read_buttons();
   }
 
@@ -421,10 +438,11 @@ void initWifi()
     delay(500);
     Serial.print(".");
     timeout -- ;
-    //Connection failed
-    if (timeout <= 0 )
+    
+    if (timeout <= 0 )//Connection failed
     {
       //print screen "connection failed, starting AP..."
+      //stop trying to connect
       //start AP
       initAP() ;
       while (WiFi.status() != WL_CONNECTED)
@@ -441,6 +459,7 @@ void initWifi()
   Serial.println(wifiData.ssid);
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+  server.on("/", handleRoot);
 
       //screen print "connected ! \rIP : WiFi.localIP()"
   if (MDNS.begin("esp8266")) {
@@ -471,19 +490,27 @@ void initAP()
 }
 
 void handleRootAP() {
-  server.send(200, "text/html", "<h1>You are connected</h1>"); //put connexion window here TODO
+  if (server.hasArg("plain")== false){ //Check if body received*
+    server.send(200, "text/html", "<h1>Connection</h1><h2>Please insert your wifi credentials</h2><form action=\"/\" method=\"post\">SSID: <input type=\"text\" name=\"ssid\"><br>Password : <input type=\"password\" name=\"password\"><br> <button type=\"submit\" formmethod=\"post\">Connect</button> </form>"); //put connexion window here TODO
+  }
+  else 
+  {
+      server.send(200, "text/html", "<h1>Connection...</h1><br><h2>AP shutting down. Please follow on-screen instructions</h2>"); 
+
+      //get SSID & Password from post request<
+
+      WiFi.softAPdisconnect(true); //https://github.com/esp8266/Arduino/issues/676
+
+      wifiData.ssid = server.arg("ssid");
+      wifiData.password =  server.arg("password");
+
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(wifiData.ssid, wifiData.password);
+  }
 }
 
-void handleGetSSID_AP() {
-  server.send(200, "text/html", "<h1>Connexion...</h1><br><h2>AP Shutting down. Please follow on-screen instructions</h2>"); //put connexion window here TODO
-
-  //get SSID & Password from post request<
-
-  WiFi.softAPdisconnect(true); //https://github.com/esp8266/Arduino/issues/676
-
-
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(wifiData.ssid, wifiData.password);
+void handleRoot() {
+  server.send(200, "text/html", "<h1>Control panel</h1>"); //put control window
 }
 
 
