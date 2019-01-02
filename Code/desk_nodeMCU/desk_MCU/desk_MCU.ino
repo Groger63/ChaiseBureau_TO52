@@ -495,22 +495,37 @@ void handleRootAP() {
   }
   else 
   {
-      server.send(200, "text/html", "<h1>Connection...</h1><br><h2>AP shutting down. Please follow on-screen instructions</h2>"); 
+	server.send(200, "text/html", "<h1>Connection...</h1><br><h2>AP shutting down. Please follow on-screen instructions</h2>"); 
+	
 
-      //get SSID & Password from post request<
+	WiFi.softAPdisconnect(true); //https://github.com/esp8266/Arduino/issues/676
 
-      WiFi.softAPdisconnect(true); //https://github.com/esp8266/Arduino/issues/676
+	strcpy(wifiData.ssid,server.arg("ssid").c_str());
+	strcpy(wifiData.password,server.arg("password").c_str()); // à tester
 
-      wifiData.ssid = server.arg("ssid");
-      wifiData.password =  server.arg("password");
-
-      WiFi.mode(WIFI_STA);
-      WiFi.begin(wifiData.ssid, wifiData.password);
+	WiFi.mode(WIFI_STA);
+	WiFi.begin(wifiData.ssid, wifiData.password);
   }
 }
 
 void handleRoot() {
-  server.send(200, "text/html", "<h1>Control panel</h1>"); //put control window
+
+	if (server.hasArg("plain")== false)
+	{ //Check if body received*
+		StaticJsonBuffer<512> jsonBuffer ;
+	    JsonObject& command = jsonBuffer.parseObject(server.arg("plain"));
+	   	JsonObject& answer = handleJsonRequest(command);
+
+	   	String output;
+  		answer.printTo(output);
+
+
+  		server.send(200, "application/json", output); //put control window
+	}
+	else
+	{
+		server.send(200, "text/html", "<h1>Control panel</h1>"); //put control window
+	}
 }
 
 
@@ -522,7 +537,14 @@ void serialEvent() { //polling method...
 
     StaticJsonBuffer<512> jsonBuffer ;
     JsonObject& command = jsonBuffer.parseObject(Serial);
-    String cmd = command["cmd"];
+   	handleJsonRequest(command).printTo(Serial);
+    Serial.readString(); // Just to make sure everything is read
+  }
+}
+
+JsonObject& handleJsonRequest(JsonObject& command)
+{
+	String cmd = command["cmd"];
 
     if ( cmd == "abort" )
     {
@@ -532,7 +554,8 @@ void serialEvent() { //polling method...
       JsonObject& obj = jb.createObject();
       obj["cmd"] = "abort";
       obj["answer"] = "ok";
-      obj.printTo(Serial);
+      //obj.printTo(Serial);
+      return obj ;
     }
     else if ( cmd == "get" )
     {
@@ -547,7 +570,8 @@ void serialEvent() { //polling method...
       obj["avancement"] = motors[AVANCEMENT]->get_position() ;
       obj["hauteur"] = motors[HAUTEUR]->get_position() ;
 
-      obj.printTo(Serial);
+      //obj.printTo(Serial);
+      return obj ;
     }
     else if (cmd == "set" )
     {
@@ -567,7 +591,8 @@ void serialEvent() { //polling method...
       JsonObject& obj = jb.createObject();
       obj["cmd"] = "set";
       obj["answer"] = "ok";
-      obj.printTo(Serial);
+      //obj.printTo(Serial);
+      return obj ;
     }
     else if ( cmd == "move" )
     {
@@ -588,7 +613,8 @@ void serialEvent() { //polling method...
       JsonObject& obj = jb.createObject();
       obj["cmd"] = "move";
       obj["answer"] = "ok";
-      obj.printTo(Serial);
+      //obj.printTo(Serial);
+      return obj ;
     }
     else
     {
@@ -597,8 +623,7 @@ void serialEvent() { //polling method...
       JsonObject& obj = jb.createObject();
       obj["cmd"] = cmd ;
       obj["answer"] = "unknown";
-      obj.printTo(Serial);
+      //obj.printTo(Serial);
+      return obj ;
     }
-    Serial.readString(); // Just to make sure everything is read
-  }
 }
