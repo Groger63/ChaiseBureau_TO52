@@ -38,7 +38,7 @@ class Motor{
 
 		int get_position();//basically just returns the position in %
 		bool is_arrived(int position);
-		int select_direction(int position);
+		int move_to(int position);
 		
         byte moving_status ;
 		short position ; //position of the motor. Varies from 0 to 1023

@@ -148,7 +148,7 @@ int Motor::go_stop()
   return STOP ;
 };
 
-int Motor::select_direction(int position)
+int Motor::move_to(int position)
 {
 /*  if (is_arrived(position))
     return go_stop() ;
