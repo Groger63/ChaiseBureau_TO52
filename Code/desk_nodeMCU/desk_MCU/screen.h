@@ -1,6 +1,26 @@
 //Screen.h
 
 
+//-------------------Screen-------------------
+
+LiquidCrystal_I2C lcd(0x27, 16, 2); // plugged on D1 & D2
+bool light_lcd = true ;
+int lcd_event ;
+#define BACKLIGHT_DURATION  3
+
+extern Timer timer1 ;
+
+
+
+void stop_backlight(void* context);
+
+static void start_backlight();
+
+
+void display_menu();
+
+void write_lcd(String line1, String line2);
+
 static void start_backlight()
 {
   if(light_lcd)

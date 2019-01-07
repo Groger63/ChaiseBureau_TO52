@@ -16,7 +16,6 @@
 
 
 
-
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
@@ -24,30 +23,14 @@
 
 #include <ESP8266mDNS.h>
 
+#include "screen.h"
+#include "SeatWifi.h"
 
 //#include <menu.h>
 //#include <menumove.h>
 //#include "User.h"
 
-//-------------------WIFI----------------
-
-#define WIFIDATA_ADDR 0
-
-struct {
-  char ssid[32] = "";
-  char password[32] = "";
-} wifiData;
-
-
-
-//-------------------AP Init-------------------
-
-/* Set these to your desired credentials. */
-const char *ssidAP = "ChairSetup";
-const char *passwordAP = "0000";
-
-ESP8266WebServer server(80);
-
+extern ESP8266WebServer server;
 
 /*
   Desk chair prototype
@@ -60,15 +43,7 @@ ESP8266WebServer server(80);
 
 //-------------------Buttons-------------------
 
-//old implementation
-//#define BUTTON_MEM = 11;     // the number of the pushbutton pin
-//#define BUTTON_SET = 12;     // the number of the pushbutton pin
 
-//#define BUTTON_SELECT_MOTOR = 10;     // the number of the pushbutton pin
-//#define BUTTON_MOTOR_BACK = 11;     // the number of the pushbutton pin
-//#define BUTTON_MOTOR_FORWARD = 12;     // the number of the pushbutton pin
-
-//#define LED_MOTOR_SELECT = 13 ;
 
 // Rotary Encoder
 
@@ -90,18 +65,12 @@ bool odd = false ;
 
 
 
-//-------------------Screen-------------------
-
-LiquidCrystal_I2C lcd(0x27, 16, 2); // plugged on D1 & D2
-bool light_lcd = true ;
-int lcd_event ;
-#define BACKLIGHT_DURATION  3
 
 //-------------------Misc-------------------
 
 #define baudrate 9600
 Timer timer1 ;
-Timer timer2 ;
+//Timer timer2 ;
 
 //-------------------ShiftReg-------------------
 
@@ -171,7 +140,8 @@ Motor *assise = new Motor(
   MAX_POT_ASSISE,
   MIN_POT_ASSISE,
   myShiftRegPtr,
-  digital_mux
+  digital_mux,
+  analog_mux
 ) ;
 
 
@@ -194,7 +164,8 @@ Motor *avancement = new Motor(
   MAX_POT_AVANCEMENT,
   MIN_POT_AVANCEMENT,
   myShiftRegPtr,
-  digital_mux
+  digital_mux,
+  analog_mux
 ) ;
 
 
@@ -205,7 +176,7 @@ Motor *avancement = new Motor(
 #define PIN_POT_HAUTEUR 10    // select the input pin for the potentiometer
 #define MAX_POT_HAUTEUR 1023
 #define MIN_POT_HAUTEUR 0
-const float margin_motor_hauteur = 0.1 ;
+const float margin_motor_hauteur = 0 ;
 
 Motor *hauteur = new Motor(
   PIN_MOTOR_HAUTEUR_BACK,
@@ -217,7 +188,8 @@ Motor *hauteur = new Motor(
   MAX_POT_HAUTEUR,
   MIN_POT_HAUTEUR,
   myShiftRegPtr,
-  digital_mux
+  digital_mux,
+  analog_mux
 );
 
 // Pins plugged to the shift reg
@@ -240,7 +212,8 @@ Motor *dossier = new Motor(
   MAX_POT_DOSSIER,
   MIN_POT_DOSSIER,
   myShiftRegPtr,
-  digital_mux
+  digital_mux,
+  analog_mux
 );
 
 
@@ -259,6 +232,7 @@ Seat * seat = new Seat(assise, avancement, hauteur, dossier);
 void setup() {
 
   Serial.begin(baudrate);
+  Serial.setDebugOutput(true);
   Serial.println("Booting...") ;
 
   pinMode (ROTARY_DT, INPUT);
@@ -291,12 +265,27 @@ void setup() {
   // homeMenu->set_submenus(submenus, 5) ;
 
   //HomeMenu->
-
+  EEPROM.begin(512);
   // myMenu = homeMenu ;
+/*
+	strcpy(wifiData.ssid,"toto");
+	strcpy(wifiData.password,"tata"); 
+	  EEPROM.put(WIFIDATA_ADDR, wifiData);
+  EEPROM.commit();*/
 
-  //initAP();
+  
+  scanWifi();
+  initWifi();
+  
 
-  analog_mux->setEnabled(false); // ?
+    /*
+  EEPROM.get(WIFIDATA_ADDR, wifiData);
+
+  while(!connectWifi())
+  {
+    Serial.println("Failed");
+  }
+  */
 }
 
 //-------------------Loop-------------------
@@ -306,7 +295,8 @@ void loop()
   /*
     for(int i = 0 ; i<8; i++)
     {
-     Serial.print( digital_mux->read(i));
+     Serial.print( analog_mux->read(i));
+     //Serial.print( motors[i]->get_position());
      Serial.print("\t");
 
     }
@@ -314,7 +304,38 @@ void loop()
      Serial.println();
      Serial.println();
   */
-
+  /*
+  if (WiFi.status() != WL_CONNECTED)
+  {
+  scanWifi();
+    switch(WiFi.status())
+    {
+      case WL_IDLE_STATUS :
+        Serial.println("WL_IDLE_STATUS");
+        break;
+      case WL_NO_SSID_AVAIL :
+        Serial.println("WL_NO_SSID_AVAIL");
+        break;
+      case WL_SCAN_COMPLETED :
+        Serial.println("WL_SCAN_COMPLETED");
+        break;
+      case WL_CONNECT_FAILED :
+        Serial.println("WL_CONNECT_FAILED");
+        break;
+      case WL_CONNECTION_LOST :
+        Serial.println("WL_CONNECTION_LOST");
+        break;
+      case WL_DISCONNECTED :
+        Serial.println("WL_DISCONNECTED");
+        break;
+        default :
+        Serial.println("WTF");
+        break;
+    }
+    initWifi();
+    delay(10);
+  }*/
+  
   if (move_asked)
   {
     move_asked = seat->move_to(
@@ -329,6 +350,8 @@ void loop()
       Serial.println("stopped");
     }
   }
+  delay(10);
+  
   if (!seat->moving)
   {
     seat->read_buttons();
@@ -336,30 +359,12 @@ void loop()
 
   check_rotary();
   timer1.update();
-  timer2.update();
-
-  serialEvent() ;
+  //timer2.update();
+  server.handleClient();
+  MDNS.update();
+  //serialEvent() ;
 }
 
-static void start_backlight()
-{
-  if (light_lcd)
-  {
-    timer1.stop(lcd_event);
-  }
-  else
-  {
-    light_lcd = true ;
-    lcd.setBacklight(light_lcd); //Set Back light turn On
-  }
-  lcd_event = timer1.after(10000, stop_backlight, (void*)10);
-}
-
-void stop_backlight(void* context)
-{
-  light_lcd = false ;
-  lcd.setBacklight(light_lcd); //Set Back light turn On
-}
 
 static void stop_seat()
 {
@@ -371,20 +376,6 @@ static void stop_seat()
   seat->moving = false;
 }
 
-void display_menu()
-{
-  //  write_lcd(myMenu->line1, myMenu->line2) ;
-}
-
-void write_lcd(String line1, String line2)
-{
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print(line1);
-  lcd.setCursor(0, 1);
-  lcd.print(line2);
-  start_backlight();
-}
 
 void check_rotary()
 {
@@ -421,114 +412,6 @@ void check_rotary()
 }
 
 
-void initWifi()
-{
-  //Read wifi info from memory
-  EEPROM.get(WIFIDATA_ADDR, wifiData);
-
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(wifiData.ssid, wifiData.password);
-
-  // Try connection
-  int timeout = 20 ;
-
-  //screen print "trying connection..."
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    Serial.print(".");
-    timeout -- ;
-    
-    if (timeout <= 0 )//Connection failed
-    {
-      //print screen "connection failed, starting AP..."
-      //stop trying to connect
-      //start AP
-      initAP() ;
-      while (WiFi.status() != WL_CONNECTED)
-      {
-        server.handleClient();
-      }
-      timeout = 20 ;
-      //screen print "trying connection..."
-    }
-  }
-
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(wifiData.ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  server.on("/", handleRoot);
-
-      //screen print "connected ! \rIP : WiFi.localIP()"
-  if (MDNS.begin("esp8266")) {
-    Serial.println("MDNS responder started");
-  }
-
-  EEPROM.put(WIFIDATA_ADDR, wifiData);
-  EEPROM.commit();
-
-}
-
-void initAP()
-{
-
-
-  Serial.print("Configuring access point...");
-  /* You can remove the password parameter if you want the AP to be open. */
-  WiFi.softAP(ssidAP, passwordAP);
-
-  IPAddress myIP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(myIP);
-  server.on("/", handleRootAP);
-  server.begin();
-  Serial.println("HTTP server started");
-  delay(1000);
-  //print on screen "SSID : ssidAP \r Password : passwordAP\rIP : IPAddress "
-}
-
-void handleRootAP() {
-  if (server.hasArg("plain")== false){ //Check if body received*
-    server.send(200, "text/html", "<h1>Connection</h1><h2>Please insert your wifi credentials</h2><form action=\"/\" method=\"post\">SSID: <input type=\"text\" name=\"ssid\"><br>Password : <input type=\"password\" name=\"password\"><br> <button type=\"submit\" formmethod=\"post\">Connect</button> </form>"); //put connexion window here TODO
-  }
-  else 
-  {
-	server.send(200, "text/html", "<h1>Connection...</h1><br><h2>AP shutting down. Please follow on-screen instructions</h2>"); 
-	
-
-	WiFi.softAPdisconnect(true); //https://github.com/esp8266/Arduino/issues/676
-
-	strcpy(wifiData.ssid,server.arg("ssid").c_str());
-	strcpy(wifiData.password,server.arg("password").c_str()); // à tester
-
-	WiFi.mode(WIFI_STA);
-	WiFi.begin(wifiData.ssid, wifiData.password);
-  }
-}
-
-void handleRoot() {
-
-	if (server.hasArg("plain")== false)
-	{ //Check if body received*
-		StaticJsonBuffer<512> jsonBuffer ;
-	    JsonObject& command = jsonBuffer.parseObject(server.arg("plain"));
-	   	JsonObject& answer = handleJsonRequest(command);
-
-	   	String output;
-  		answer.printTo(output);
-
-
-  		server.send(200, "application/json", output); //put control window
-	}
-	else
-	{
-		server.send(200, "text/html", "<h1>Control panel</h1>"); //put control window
-	}
-}
-
-
 void serialEvent() { //polling method...
 
 
@@ -537,15 +420,19 @@ void serialEvent() { //polling method...
 
     StaticJsonBuffer<512> jsonBuffer ;
     JsonObject& command = jsonBuffer.parseObject(Serial);
-   	handleJsonRequest(command).printTo(Serial);
+   	Serial.println(handleJsonRequest(command)) ; //.printTo(Serial);
     Serial.readString(); // Just to make sure everything is read
   }
 }
 
-JsonObject& handleJsonRequest(JsonObject& command)
+String handleJsonRequest(JsonObject& command)
 {
-	String cmd = command["cmd"];
+    Serial.println("1");
+	  String cmd = command["cmd"];
+    String answer ;
 
+    Serial.println(cmd);
+    Serial.println("2");
     if ( cmd == "abort" )
     {
       seat->aborts = true ;
@@ -554,24 +441,37 @@ JsonObject& handleJsonRequest(JsonObject& command)
       JsonObject& obj = jb.createObject();
       obj["cmd"] = "abort";
       obj["answer"] = "ok";
-      //obj.printTo(Serial);
-      return obj ;
+      obj.printTo(answer);
+      
+      return answer ;
     }
     else if ( cmd == "get" )
     {
+    Serial.println("3");
       //create Json object with each seat position
       const int capacity = JSON_OBJECT_SIZE(6);
+    Serial.println("4ok");
       StaticJsonBuffer<capacity> jb;
+    Serial.println("5");
       JsonObject& obj = jb.createObject();
+    Serial.println("6");
       obj["cmd"] = "get";
       obj["answer"] = "ok";
+ 
       obj["dossier"] = motors[DOSSIER]->get_position() ;
       obj["assise"] = motors[ASSISE]->get_position() ;
       obj["avancement"] = motors[AVANCEMENT]->get_position() ;
       obj["hauteur"] = motors[HAUTEUR]->get_position() ;
-
+          /*
+      obj["dossier"] = motors[DOSSIER]->get_position() ;
+      obj["assise"] = motors[ASSISE]->get_position() ;
+      obj["avancement"] = motors[AVANCEMENT]->get_position() ;
+      obj["hauteur"] = analog_mux->read(PIN_POT_HAUTEUR) ;//motors[HAUTEUR]->get_position() ;
+ */
+    Serial.println("7");
       //obj.printTo(Serial);
-      return obj ;
+      obj.printTo(answer);
+      return answer ;
     }
     else if (cmd == "set" )
     {
@@ -592,7 +492,8 @@ JsonObject& handleJsonRequest(JsonObject& command)
       obj["cmd"] = "set";
       obj["answer"] = "ok";
       //obj.printTo(Serial);
-      return obj ;
+      obj.printTo(answer);
+      return answer ;
     }
     else if ( cmd == "move" )
     {
@@ -614,7 +515,8 @@ JsonObject& handleJsonRequest(JsonObject& command)
       obj["cmd"] = "move";
       obj["answer"] = "ok";
       //obj.printTo(Serial);
-      return obj ;
+      obj.printTo(answer);
+      return answer ;
     }
     else
     {
@@ -624,6 +526,7 @@ JsonObject& handleJsonRequest(JsonObject& command)
       obj["cmd"] = cmd ;
       obj["answer"] = "unknown";
       //obj.printTo(Serial);
-      return obj ;
+      obj.printTo(answer);
+      return answer ;
     }
 }
