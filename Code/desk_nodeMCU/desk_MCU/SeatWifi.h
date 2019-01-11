@@ -257,14 +257,9 @@ void handleRoot() {
 */
     StaticJsonBuffer<512> jsonBuffer ;
     JsonObject& command = jsonBuffer.parseObject(server.arg("command"));
-    Serial.println(server.arg("command"));
-    //JsonObject& answer = handleJsonRequest(command);
-    Serial.println("2.1");
+    
     String output = handleJsonRequest(command);
-    Serial.println("2.2");
-    //answer.printTo(output);
-    Serial.println("2.3");
-    //Serial.println(output);
+
     server.send(200, "application/json", output); //put control window
   }
   else

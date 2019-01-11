@@ -77,12 +77,16 @@ Timer timer1 ;
 #define PIN_DS 14// D5    
 #define PIN_STCP 12// D6
 #define PIN_SHCP 13 // D7
+#define NUMBER_SHIFTREG 3
 
-ShiftReg *myShiftRegPtr = new ShiftReg(PIN_DS, PIN_STCP, PIN_SHCP, 2) ; //According to the new Schematics, should have a 3rd SR
+ShiftReg *myShiftRegPtr = new ShiftReg(PIN_DS, PIN_STCP, PIN_SHCP, NUMBER_SHIFTREG) ; 
 
 
 //-------------------Multiplexer-------------------
-
+/*
+CustomType4051Mux * digital_mux = new CustomType4051Mux(A0, INPUT, DIGITAL, 17, myShiftRegPtr, 18, 19, 16);
+CustomType4051Mux * analog_mux = new CustomType4051Mux(A0, INPUT, ANALOG, 21, myShiftRegPtr, 22, 23, 20 );
+*/
 CustomType4051Mux * digital_mux = new CustomType4051Mux(A0, INPUT, DIGITAL, 9, myShiftRegPtr, 10, 11, 8);
 CustomType4051Mux * analog_mux = new CustomType4051Mux(A0, INPUT, ANALOG, 13, myShiftRegPtr, 14, 15, 12 );
 //Type4051Mux * analog_mux = new Type4051Mux(A0, INPUT, ANALOG, );
@@ -90,7 +94,7 @@ CustomType4051Mux * analog_mux = new CustomType4051Mux(A0, INPUT, ANALOG, 13, my
 
 //-------------------IHM-------------------
 //TODO
-/*
+/*²
   Menu * homeMenu = new Menu("Home");
   int nb_submenus = 5 ;
 
@@ -221,7 +225,7 @@ Motor *  motors[4] = {assise, avancement, hauteur, dossier} ;
 
 //-------------------Seat-------------------
 
-int position_asked[4] = { 512, 512 , 512, 512 } ;
+float position_asked[4] = { 512, 512 , 512, 512 } ;
 bool move_asked = false ;
 bool aborting = false ;
 Seat * seat = new Seat(assise, avancement, hauteur, dossier);
@@ -447,14 +451,10 @@ String handleJsonRequest(JsonObject& command)
     }
     else if ( cmd == "get" )
     {
-    Serial.println("3");
       //create Json object with each seat position
       const int capacity = JSON_OBJECT_SIZE(6);
-    Serial.println("4ok");
       StaticJsonBuffer<capacity> jb;
-    Serial.println("5");
       JsonObject& obj = jb.createObject();
-    Serial.println("6");
       obj["cmd"] = "get";
       obj["answer"] = "ok";
  
@@ -468,17 +468,20 @@ String handleJsonRequest(JsonObject& command)
       obj["avancement"] = motors[AVANCEMENT]->get_position() ;
       obj["hauteur"] = analog_mux->read(PIN_POT_HAUTEUR) ;//motors[HAUTEUR]->get_position() ;
  */
-    Serial.println("7");
+
       //obj.printTo(Serial);
       obj.printTo(answer);
       return answer ;
     }
+
+
+
     else if (cmd == "set" )
     {
-      int dossier = command["dossier"] ;
-      int avancement = command["avancement"] ;
-      int assise = command["assise"] ;
-      int hauteur = command["assise"] ;
+      float dossier = command["dossier"] ;
+      float avancement = command["avancement"] ;
+      float assise = command["assise"] ;
+      float hauteur = command["hauteur"] ;
 
       position_asked[DOSSIER] = dossier ;
       position_asked[ASSISE] = assise ;
@@ -497,10 +500,10 @@ String handleJsonRequest(JsonObject& command)
     }
     else if ( cmd == "move" )
     {
-      int dossier = command["dossier"] ;
-      int avancement = command["avancement"] ;
-      int assise = command["assise"] ;
-      int hauteur = command["hauteur"] ;
+      float dossier = command["dossier"] ;
+      float avancement = command["avancement"] ;
+      float assise = command["assise"] ;
+      float hauteur = command["hauteur"] ;
 
       position_asked[DOSSIER] = motors[DOSSIER]->get_position() + dossier ;
       position_asked[ASSISE] = motors[ASSISE]->get_position() + assise ;
