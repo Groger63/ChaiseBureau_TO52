@@ -1,5 +1,5 @@
 //Screen.h
-
+#include <menuGraph.h>
 
 //-------------------Screen-------------------
 
@@ -9,6 +9,7 @@ int lcd_event ;
 #define BACKLIGHT_DURATION  3
 
 extern Timer timer1 ;
+extern MenuGraph myMenus ;
 
 
 
@@ -43,7 +44,9 @@ void stop_backlight(void* context)
 
 void display_menu()
 {
-//  write_lcd(myMenu->line1, myMenu->line2) ;
+  Serial.print("line 2 : ");
+  Serial.println(myMenus.getCurrentMenu()->line2);
+  write_lcd(myMenus.getCurrentMenu()->line1, myMenus.getCurrentMenu()->line2) ;
 }
 
 void write_lcd(String line1, String line2)

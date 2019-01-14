@@ -4,6 +4,9 @@
 
 #include <Wire.h> // Include Wire.h to control I2C
 #include <LiquidCrystal_I2C.h> //Download & include the code library can be downloaded below
+
+LiquidCrystal_I2C * lcd = new LiquidCrystal_I2C(0x27, 16, 2); // plugged on D1 & D2
+
 #include "Timer.h"
 
 #include <EEPROM.h> //https://arduino.stackexchange.com/questions/25945/how-to-read-and-write-eeprom-in-esp8266
@@ -13,24 +16,22 @@
 #include <seatmux.h>
 #include <shiftreg.h>
 
+Timer * myTimer = new Timer() ;
+#include "seatScreen.h"
+SeatScreen * mySeatScreen = new SeatScreen(lcd, myTimer, 3 ) ;
+
+#include <wifiSeat.h>
+WifiSeat * myWifiSeat = new WifiSeat(mySeatScreen) ;
 
 
+#include <menuGraph.h>
+#include "initMenus.h"
 
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
-#include <ESP8266WebServer.h>
+//#include "screen.h"
 
 
-#include <ESP8266mDNS.h>
-
-#include "screen.h"
-#include "SeatWifi.h"
-
-//#include <menu.h>
 //#include <menumove.h>
 //#include "User.h"
-
-extern ESP8266WebServer server;
 
 /*
   Desk chair prototype
@@ -77,16 +78,17 @@ Timer timer1 ;
 #define PIN_DS 14// D5    
 #define PIN_STCP 12// D6
 #define PIN_SHCP 13 // D7
-#define NUMBER_SHIFTREG 3
+#define NUMBER_SHIFTREG 2
 
-ShiftReg *myShiftRegPtr = new ShiftReg(PIN_DS, PIN_STCP, PIN_SHCP, NUMBER_SHIFTREG) ; 
+ShiftReg *myShiftRegPtr = new ShiftReg(PIN_DS, PIN_STCP, PIN_SHCP, NUMBER_SHIFTREG) ;
 
 
 //-------------------Multiplexer-------------------
 /*
-CustomType4051Mux * digital_mux = new CustomType4051Mux(A0, INPUT, DIGITAL, 17, myShiftRegPtr, 18, 19, 16);
-CustomType4051Mux * analog_mux = new CustomType4051Mux(A0, INPUT, ANALOG, 21, myShiftRegPtr, 22, 23, 20 );
+  CustomType4051Mux * digital_mux = new CustomType4051Mux(A0, INPUT, DIGITAL, 17, myShiftRegPtr, 18, 19, 16);
+  CustomType4051Mux * analog_mux = new CustomType4051Mux(A0, INPUT, ANALOG, 21, myShiftRegPtr, 22, 23, 20 );
 */
+
 CustomType4051Mux * digital_mux = new CustomType4051Mux(A0, INPUT, DIGITAL, 9, myShiftRegPtr, 10, 11, 8);
 CustomType4051Mux * analog_mux = new CustomType4051Mux(A0, INPUT, ANALOG, 13, myShiftRegPtr, 14, 15, 12 );
 //Type4051Mux * analog_mux = new Type4051Mux(A0, INPUT, ANALOG, );
@@ -233,7 +235,8 @@ Seat * seat = new Seat(assise, avancement, hauteur, dossier);
 
 //-------------------Setup routine-------------------
 
-void setup() {
+void setup()
+{
 
   Serial.begin(baudrate);
   Serial.setDebugOutput(true);
@@ -249,11 +252,11 @@ void setup() {
 
 
   // initialize the LCD
-  lcd.begin();
-  lcd.clear();
+  //lcd.begin();
+  //lcd.clear();
   // Turn on the blacklight and print a message.
 
-  write_lcd("Hello world !", "----o----");
+  mySeatScreen->write_lcd("Booting...", "Please wait");
 
   Serial.println("Booting...") ;
 
@@ -269,49 +272,39 @@ void setup() {
   // homeMenu->set_submenus(submenus, 5) ;
 
   //HomeMenu->
-  EEPROM.begin(512);
   // myMenu = homeMenu ;
-/*
-	strcpy(wifiData.ssid,"toto");
-	strcpy(wifiData.password,"tata"); 
-	  EEPROM.put(WIFIDATA_ADDR, wifiData);
-  EEPROM.commit();*/
+  /*
+  	strcpy(wifiData.ssid,"toto");
+  	strcpy(wifiData.password,"tata");
+  	  EEPROM.put(WIFIDATA_ADDR, wifiData);
+    EEPROM.commit();*/
 
-  
-  scanWifi();
-  initWifi();
-  
 
-    /*
-  EEPROM.get(WIFIDATA_ADDR, wifiData);
+    
 
-  while(!connectWifi())
-  {
+  /*
+    EEPROM.get(WIFIDATA_ADDR, wifiData);
+
+    while(!connectWifi())
+    {
     Serial.println("Failed");
-  }
+    }
   */
+  myMenus.getCurrentMenu()->display();
+  myWifiSeat->start() ;
+  myMenus.getCurrentMenu()->display();
 }
 
 //-------------------Loop-------------------
 
 void loop()
 {
+
+
   /*
-    for(int i = 0 ; i<8; i++)
+    if (WiFi.status() != WL_CONNECTED)
     {
-     Serial.print( analog_mux->read(i));
-     //Serial.print( motors[i]->get_position());
-     Serial.print("\t");
-
-    }
-
-     Serial.println();
-     Serial.println();
-  */
-  /*
-  if (WiFi.status() != WL_CONNECTED)
-  {
-  scanWifi();
+    scanWifi();
     switch(WiFi.status())
     {
       case WL_IDLE_STATUS :
@@ -338,8 +331,8 @@ void loop()
     }
     initWifi();
     delay(10);
-  }*/
-  
+    }*/
+
   if (move_asked)
   {
     move_asked = seat->move_to(
@@ -355,7 +348,7 @@ void loop()
     }
   }
   delay(10);
-  
+
   if (!seat->moving)
   {
     seat->read_buttons();
@@ -363,9 +356,10 @@ void loop()
 
   check_rotary();
   timer1.update();
+  myTimer->update();
   //timer2.update();
-  server.handleClient();
-  MDNS.update();
+  myWifiSeat->handleClient();
+  //MDNS.update();
   //serialEvent() ;
 }
 
@@ -387,11 +381,15 @@ void check_rotary()
 
   aState = digitalRead(ROTARY_DT); // Reads the "current" state of the outputA
   // If the previous and the current state of the outputA are different, that means a Pulse has occured
-
+  //if (digitalRead(ROTARY_SW) == LOW) Serial.println("low"); else Serial.println("high");
 
   if (digitalRead(ROTARY_SW) == LOW && !sw_clicked)
   {
-    //myMenu->update(SWITCH);
+    //myMenus.select();
+    //Serial.println("Switch");
+
+    //digitalWrite(ROTARY_SW, HIGH);
+    //sw_clicked = true ;
   }
   else if (digitalRead(ROTARY_SW) == HIGH && sw_clicked) sw_clicked = false ;
 
@@ -403,10 +401,15 @@ void check_rotary()
       if (digitalRead(ROTARY_CLK) != aState)
       {
         //myMenu->update(LEFT);
+        myMenus.select();
+        //myMenus.left();
+        Serial.println("Select");
       }
       else
       {
         //myMenu->update(RIGHT) ;
+        myMenus.right();
+        Serial.println("right");
       }
     }
     odd = !odd;
@@ -421,115 +424,116 @@ void serialEvent() { //polling method...
 
   while (Serial.available() > 0) {
 
+    /*
+        StaticJsonBuffer<512> jsonBuffer ;
+        JsonObject& command = jsonBuffer.parseObject(Serial);
+       	Serial.println(handleJsonRequest(command)) ; //.printTo(Serial);
+    */
+    myMenus.select();
 
-    StaticJsonBuffer<512> jsonBuffer ;
-    JsonObject& command = jsonBuffer.parseObject(Serial);
-   	Serial.println(handleJsonRequest(command)) ; //.printTo(Serial);
     Serial.readString(); // Just to make sure everything is read
   }
 }
 
 String handleJsonRequest(JsonObject& command)
 {
-    Serial.println("1");
-	  String cmd = command["cmd"];
-    String answer ;
+  String cmd = command["cmd"];
+  String answer ;
 
-    Serial.println(cmd);
-    Serial.println("2");
-    if ( cmd == "abort" )
-    {
-      seat->aborts = true ;
-      const int capacity = JSON_OBJECT_SIZE(2);
-      StaticJsonBuffer<capacity> jb;
-      JsonObject& obj = jb.createObject();
-      obj["cmd"] = "abort";
-      obj["answer"] = "ok";
-      obj.printTo(answer);
-      
-      return answer ;
-    }
-    else if ( cmd == "get" )
-    {
-      //create Json object with each seat position
-      const int capacity = JSON_OBJECT_SIZE(6);
-      StaticJsonBuffer<capacity> jb;
-      JsonObject& obj = jb.createObject();
-      obj["cmd"] = "get";
-      obj["answer"] = "ok";
- 
-      obj["dossier"] = motors[DOSSIER]->get_position() ;
-      obj["assise"] = motors[ASSISE]->get_position() ;
-      obj["avancement"] = motors[AVANCEMENT]->get_position() ;
-      obj["hauteur"] = motors[HAUTEUR]->get_position() ;
-          /*
+  if ( cmd == "abort" )
+  {
+    seat->aborts = true ;
+    const int capacity = JSON_OBJECT_SIZE(2);
+    StaticJsonBuffer<capacity> jb;
+    JsonObject& obj = jb.createObject();
+    obj["cmd"] = "abort";
+    obj["answer"] = "ok";
+    obj.printTo(answer);
+
+    return answer ;
+  }
+  else if ( cmd == "get" )
+  {
+    //create Json object with each seat position
+    const int capacity = JSON_OBJECT_SIZE(6);
+    StaticJsonBuffer<capacity> jb;
+    JsonObject& obj = jb.createObject();
+    obj["cmd"] = "get";
+    obj["answer"] = "ok";
+
+    obj["dossier"] = motors[DOSSIER]->get_position() ;
+    obj["assise"] = motors[ASSISE]->get_position() ;
+    obj["avancement"] = motors[AVANCEMENT]->get_position() ;
+    obj["hauteur"] = motors[HAUTEUR]->get_position() ;
+    /*
       obj["dossier"] = motors[DOSSIER]->get_position() ;
       obj["assise"] = motors[ASSISE]->get_position() ;
       obj["avancement"] = motors[AVANCEMENT]->get_position() ;
       obj["hauteur"] = analog_mux->read(PIN_POT_HAUTEUR) ;//motors[HAUTEUR]->get_position() ;
- */
+    */
 
-      //obj.printTo(Serial);
-      obj.printTo(answer);
-      return answer ;
-    }
+    //obj.printTo(Serial);
+    obj.printTo(answer);
+    return answer ;
+  }
 
 
 
-    else if (cmd == "set" )
-    {
-      float dossier = command["dossier"] ;
-      float avancement = command["avancement"] ;
-      float assise = command["assise"] ;
-      float hauteur = command["hauteur"] ;
+  else if (cmd == "set" )
+  {
+    float dossier = command["dossier"] ;
+    float avancement = command["avancement"] ;
+    float assise = command["assise"] ;
+    float hauteur = command["hauteur"] ;
 
-      position_asked[DOSSIER] = dossier ;
-      position_asked[ASSISE] = assise ;
-      position_asked[AVANCEMENT] = avancement ;
-      position_asked[HAUTEUR] = hauteur ;
-      move_asked = true ;
+    Serial.println(dossier);
+    position_asked[DOSSIER] = dossier ;
+    position_asked[ASSISE] = assise ;
+    position_asked[AVANCEMENT] = avancement ;
+    position_asked[HAUTEUR] = hauteur ;
+    move_asked = true ;
 
-      const int capacity = JSON_OBJECT_SIZE(2);
-      StaticJsonBuffer<capacity> jb;
-      JsonObject& obj = jb.createObject();
-      obj["cmd"] = "set";
-      obj["answer"] = "ok";
-      //obj.printTo(Serial);
-      obj.printTo(answer);
-      return answer ;
-    }
-    else if ( cmd == "move" )
-    {
-      float dossier = command["dossier"] ;
-      float avancement = command["avancement"] ;
-      float assise = command["assise"] ;
-      float hauteur = command["hauteur"] ;
+    const int capacity = JSON_OBJECT_SIZE(2);
+    StaticJsonBuffer<capacity> jb;
+    JsonObject& obj = jb.createObject();
+    obj["cmd"] = "set";
+    obj["answer"] = "ok";
+    //obj.printTo(Serial);
+    obj.printTo(answer);
+    return answer ;
+  }
+  else if ( cmd == "move" )
+  {
+    float dossier = command["dossier"] ;
+    float avancement = command["avancement"] ;
+    float assise = command["assise"] ;
+    float hauteur = command["hauteur"] ;
 
-      position_asked[DOSSIER] = motors[DOSSIER]->get_position() + dossier ;
-      position_asked[ASSISE] = motors[ASSISE]->get_position() + assise ;
-      position_asked[AVANCEMENT] = motors[AVANCEMENT]->get_position() + avancement ;
-      position_asked[HAUTEUR] = motors[HAUTEUR]->get_position() + hauteur ;
+    position_asked[DOSSIER] = motors[DOSSIER]->get_position() + dossier ;
+    position_asked[ASSISE] = motors[ASSISE]->get_position() + assise ;
+    position_asked[AVANCEMENT] = motors[AVANCEMENT]->get_position() + avancement ;
+    position_asked[HAUTEUR] = motors[HAUTEUR]->get_position() + hauteur ;
 
-      move_asked = true ;
+    move_asked = true ;
 
-      const int capacity = JSON_OBJECT_SIZE(2);
-      StaticJsonBuffer<capacity> jb;
-      JsonObject& obj = jb.createObject();
-      obj["cmd"] = "move";
-      obj["answer"] = "ok";
-      //obj.printTo(Serial);
-      obj.printTo(answer);
-      return answer ;
-    }
-    else
-    {
-      const int capacity = JSON_OBJECT_SIZE(2);
-      StaticJsonBuffer<capacity> jb;
-      JsonObject& obj = jb.createObject();
-      obj["cmd"] = cmd ;
-      obj["answer"] = "unknown";
-      //obj.printTo(Serial);
-      obj.printTo(answer);
-      return answer ;
-    }
+    const int capacity = JSON_OBJECT_SIZE(2);
+    StaticJsonBuffer<capacity> jb;
+    JsonObject& obj = jb.createObject();
+    obj["cmd"] = "move";
+    obj["answer"] = "ok";
+    //obj.printTo(Serial);
+    obj.printTo(answer);
+    return answer ;
+  }
+  else
+  {
+    const int capacity = JSON_OBJECT_SIZE(2);
+    StaticJsonBuffer<capacity> jb;
+    JsonObject& obj = jb.createObject();
+    obj["cmd"] = cmd ;
+    obj["answer"] = "unknown";
+    //obj.printTo(Serial);
+    obj.printTo(answer);
+    return answer ;
+  }
 }
